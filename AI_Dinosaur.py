@@ -1,8 +1,12 @@
 import numpy as np
-from PIL import ImageGrab
+from PIL import ImageGrab, Image
 import cv2
 import time
 import pyautogui
+from mss import mss
+
+
+
 
 ##for i in range(4)[::-1]:
 ##    print(i+1)
@@ -21,25 +25,29 @@ def draw_lines(image, lines):
     
 def process_image(original_image):
     processed_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
-    processed_image = cv2.Canny(processed_image, threshold1 = 200, threshold2 =300)
-    processed_image = cv2.GaussianBlur(processed_image, (5,5),0)
+    processed_image_canny = cv2.Canny(processed_image, threshold1 = 200, threshold2 =300)
+    processed_image_canny = cv2.GaussianBlur(processed_image_canny, (5,5),0)
     #edges
-    lines = cv2.HoughLinesP(processed_image, 1,np.pi/180, 180, np.array([]), 50, 1)
-    draw_lines(processed_image, lines)
+    lines = cv2.HoughLinesP(processed_image_canny, 1,np.pi/180, 180, np.array([]), 50, 1)
+    draw_lines(original_image, lines)
     return processed_image
 
-def screen_record(): 
-    last_time = time.time()
+def screen_record():
+    sct = mss()
     while(True):
-        # 800x600 windowed mode
-        printscreen =  np.array(ImageGrab.grab(bbox=(800,200,2050,500)))
-        new_screen = process_image(printscreen)
-        print('loop took {} seconds'.format(time.time()-last_time))
         last_time = time.time()
-##        cv2.imshow('Canny Edge', new_screen)
-####        cv2.imshow('window',cv2.cvtColor(printscreen, cv2.COLOR_BGR2RGB))
-##        if cv2.waitKey(25) & 0xFF == ord('q'):
-##            cv2.destroyAllWindows()
-##            break
+        monitor = {'top': 200, 'left': 0, 'width': 810, 'height': 420}        
+        img = np.array(sct.grab(monitor))
+        img_resize = cv2.resize(img, (405,210))
+        processed_img = process_image(img)
+        print('{} FPS'.format(1/(time.time()-last_time)))
+        last_time = time.time()
+        
+
+        cv2.imshow('image', img_resize)
+        
+        if cv2.waitKey(25) & 0xFF == ord('q'):
+            cv2.destroyAllWindows()
+            break
 
 screen_record()
