@@ -1,0 +1,16 @@
+——————————————————15 July 2017 01:55AM——————————————————
+
+Successfully found the position of the player and the ball
+Used color filter to achieve this. The next step would be to
+find their speeds and direction(acceleration if required)
+Also bigger aim of moving the player automatically to a given
+coordinate.
+
+——————————————————15 July 2017 00:54AM——————————————————
+
+Dilemma on the tracking algorithm to use. Either the 
+Color filtering or just using Hough filter. 
+Need to average out the circles found on the image and
+somehow decide if its a ball, player or goalpost.
+Leaning towards color filter for that reason.
+
