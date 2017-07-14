@@ -13,6 +13,36 @@ from mss import mss
 ##print('space')
 ##pyautogui.keyDown('space')
 
+def rgb2hsv(rgb):
+    r,g,b = rgb
+    
+    r_prime = r/255
+    g_prime = g/255
+    b_prime = b/255
+
+    Cmax = max(r_prime,g_prime,b_prime)
+    Cmin = min(r_prime,g_prime,b_prime)
+    delta = Cmax-Cmin
+
+    if delta == 0:
+        h = 0
+    elif Cmax == r_prime:
+        h = 60*(((g_prime-b_prime)/delta)%6)
+    elif Cmax == g_prime:
+        h = 60*(((b_prime-r_prime)/delta)+2)
+    elif Cmax == b_prime:
+        h = 60*(((r_prime-g_prime)/delta)+4)
+
+    if Cmax == 0:
+        s = 0
+    else:
+        s = delta/Cmax
+
+    v = Cmax
+
+    return h,int(s*255),int(v*255)
+    
+
 def get_slope_bias(coords):
     x1 =coords[0]
     y1 =coords[1]
@@ -43,7 +73,7 @@ def draw_lines(image, lines):
                 horizontal.append(b)
         x1,y1,x2,y2 = find_field(vertical,horizontal)
 
-        cv2.rectangle(image, (x1,y1), (x2,y2),[0,255,0],cv2.FILLED)
+        cv2.rectangle(image, (x1,y1), (x2,y2),[255,255,0],3)
     
 
     except:
@@ -82,15 +112,38 @@ def find_field(vertical,horizontal):
 
     return vLine[0],hLine[0],vLine[-1],hLine[-1]
 
+def color_filter(image,color):
+    hsvImg = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    # define range of blue color in HSV
+    hsv_color = np.array(rgb2hsv(color))
+    print(hsv_color)
+    delta = np.array([160,50,50])
+    lower = hsv_color  - delta
+    upper = hsv_color  + delta
+    # Threshold the HSV image to get only blue color
+    mask = cv2.inRange(hsvImg, lower, upper)
+
+    res = cv2.bitwise_and(image,image, mask= mask)
+    cv2.imshow('Image_Blue', res)
+    if cv2.waitKey(25) & 0xFF == ord('q'):
+            cv2.destroyAllWindows()
+            
+    return res
+    
+
+    
     
     
 def process_image(original_image):
     processed_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
     processed_image_canny = cv2.Canny(processed_image, threshold1 = 200, threshold2 =300)
     processed_image_blur = cv2.GaussianBlur(processed_image_canny, (5,5),0)
+    processed_image_blue = color_filter(original_image,[255,255,255])
+    processed_image_blue_gray = cv2.cvtColor(processed_image_blue, cv2.COLOR_BGR2GRAY)
     #edges
     lines = cv2.HoughLinesP(processed_image_blur, 1,np.pi/180, 180, np.array([]), 600, 30)
-    circles = cv2.HoughCircles(processed_image,cv2.HOUGH_GRADIENT, 1.2,5,
+    circles = cv2.HoughCircles(processed_image_blue_gray,cv2.HOUGH_GRADIENT, 1.2,5,
                             param1=60,param2=30,minRadius=20,maxRadius=40 )
 
     draw_lines(original_image, lines)
@@ -100,14 +153,14 @@ def process_image(original_image):
 
 def screen_record():
     sct = mss()
-##    for i in range(1):
+    for i in range(1):
     
-    while 1:
+##    while 1:
         last_time = time.time()
         monitor = {'top': 230, 'left': 30, 'width': 820, 'height': 400}        
         img = np.array(sct.grab(monitor))
         processed_img = process_image(img)
-        img_resize = cv2.resize(img, (int(monitor['width']/4),int(monitor['height']/4)))
+        img_resize = cv2.resize(img, (int(monitor['width']/5),int(monitor['height']/5)))
 
         print('{} FPS'.format(1/(time.time()-last_time)))
         last_time = time.time()
