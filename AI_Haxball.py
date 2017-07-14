@@ -6,8 +6,6 @@ import pyautogui
 from mss import mss
 
 
-
-
 ##for i in range(4)[::-1]:
 ##    print(i+1)
 ##    time.sleep(1)
@@ -50,6 +48,17 @@ def draw_lines(image, lines):
 
     except:
         pass
+
+def draw_circles(image,circles):
+    try:
+
+        for circle in circles[0]:
+            x,y,r = circle
+            cv2.circle(image, (x,y),r,(255,0,255),4)
+
+    
+    except:
+        pass
     
 def find_field(vertical,horizontal):
     vertical = sorted(vertical)
@@ -77,19 +86,22 @@ def find_field(vertical,horizontal):
     
 def process_image(original_image):
     processed_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
-    processed_image = cv2.Canny(processed_image, threshold1 = 200, threshold2 =300)
-    processed_image_blur = cv2.GaussianBlur(processed_image, (5,5),0)
+    processed_image_canny = cv2.Canny(processed_image, threshold1 = 200, threshold2 =300)
+    processed_image_blur = cv2.GaussianBlur(processed_image_canny, (5,5),0)
     #edges
     lines = cv2.HoughLinesP(processed_image_blur, 1,np.pi/180, 180, np.array([]), 600, 30)
+    circles = cv2.HoughCircles(processed_image,cv2.HOUGH_GRADIENT, 1.2,5,
+                            param1=60,param2=30,minRadius=20,maxRadius=40 )
 
     draw_lines(original_image, lines)
-
+    draw_circles(original_image,circles)
 
     return processed_image
 
 def screen_record():
     sct = mss()
 ##    for i in range(1):
+    
     while 1:
         last_time = time.time()
         monitor = {'top': 230, 'left': 30, 'width': 820, 'height': 400}        
