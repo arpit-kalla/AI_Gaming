@@ -3,16 +3,15 @@ from PIL import ImageGrab, Image
 import cv2
 import time
 import pyautogui
+import random
 from mss import mss
 
+def show_image(image):
+    cv2.imshow(str(random.randint(1,101)), image)
+    if cv2.waitKey(25) & 0xFF == ord('q'):
+        cv2.destroyAllWindows()
 
-##for i in range(4)[::-1]:
-##    print(i+1)
-##    time.sleep(1)
-##
-##print('space')
-##pyautogui.keyDown('space')
-
+# Enter a RGB color and the funtion returns the HSV equivalent
 def rgb2hsv(rgb):
     r,g,b = rgb
     
@@ -41,8 +40,9 @@ def rgb2hsv(rgb):
     v = Cmax
 
     return h,int(s*255),int(v*255)
-    
 
+
+#Converts the coordinates to equivalent slope and intercept 
 def get_slope_bias(coords):
     x1 =coords[0]
     y1 =coords[1]
@@ -58,6 +58,71 @@ def get_slope_bias(coords):
         m = 0
         b = x1
     return m,b,isVertical
+
+#Enter a image and color and it filters the objects of that color in that image
+def color_filter(image,color,pure):
+    hsvImg = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    hsv_color = np.array(rgb2hsv(color))
+
+    if pure == False:
+        delta = np.array([10,100,100])
+    else:
+        delta = np.array([10,10,10])
+    
+    lower = hsv_color  - delta
+    upper = hsv_color  + delta
+
+    mask = cv2.inRange(hsvImg, lower, upper)
+    res = cv2.bitwise_and(image,image, mask= mask)
+    return res
+
+
+def get_player(image):
+    try:
+        f_img = color_filter(image,[255,0,0],False)
+        f_img = cv2.cvtColor(f_img, cv2.COLOR_BGR2GRAY)
+        im2 ,contours,hierarchy = cv2.findContours(f_img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        c = contours[0]
+        M = cv2.moments(c)
+        cX = int(M["m10"] / M["m00"])
+        cY = int(M["m01"] / M["m00"])
+        (x,y),radius = cv2.minEnclosingCircle(c)
+        center = (int(x),int(y))
+        radius = int(radius)
+        cv2.circle(image, center, radius, (255, 0, 0), 2)
+        cv2.putText(image, "Player Center: {},{}".format(center[0],center[1]), (15, 15),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
+        return center,radius
+    except:
+        pass
+
+def get_ball(image):
+    try:
+        f_img = color_filter(image,[255,255,255],True)
+        f_img = cv2.cvtColor(f_img, cv2.COLOR_BGR2GRAY)
+        im2 ,contours,hierarchy = cv2.findContours(f_img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in contours:
+            if cv2.contourArea(c)>100:
+                M = cv2.moments(c)
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                (x,y),radius = cv2.minEnclosingCircle(c)
+                center = (int(x),int(y))
+                radius = int(radius)
+                cv2.circle(image, center, radius, (255, 0, 0), 2)
+                cv2.putText(image, "Ball Center: {},{}".format(center[0],center[1]), (200, 15),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
+                
+        return center,radius
+    except:
+        pass
+
+
+ 
+    
+    
+    
+    
 
 def draw_lines(image, lines):
     try:
@@ -81,12 +146,10 @@ def draw_lines(image, lines):
 
 def draw_circles(image,circles):
     try:
-
+        print(len(circles[0]))
         for circle in circles[0]:
             x,y,r = circle
             cv2.circle(image, (x,y),r,(255,0,255),4)
-
-    
     except:
         pass
     
@@ -101,7 +164,7 @@ def find_field(vertical,horizontal):
     for i in range(len(vertical)-1):
         if abs(vertical[i+1]-vertical[i])>40:
             vLine.append(int(sum(vertical[:i+1])/len(vertical[:i+1])))
-            partition = i+1
+            partition = i+1 
     vLine.append(int(sum(vertical[partition:])/len(vertical[partition:])))
 
     for i in range(len(horizontal)-1):
@@ -112,62 +175,45 @@ def find_field(vertical,horizontal):
 
     return vLine[0],hLine[0],vLine[-1],hLine[-1]
 
-def color_filter(image,color):
-    hsvImg = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    # define range of blue color in HSV
-    hsv_color = np.array(rgb2hsv(color))
-    print(hsv_color)
-    delta = np.array([160,50,50])
-    lower = hsv_color  - delta
-    upper = hsv_color  + delta
-    # Threshold the HSV image to get only blue color
-    mask = cv2.inRange(hsvImg, lower, upper)
-
-    res = cv2.bitwise_and(image,image, mask= mask)
-    cv2.imshow('Image_Blue', res)
-    if cv2.waitKey(25) & 0xFF == ord('q'):
-            cv2.destroyAllWindows()
-            
-    return res
     
 
     
     
     
 def process_image(original_image):
-    processed_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
-    processed_image_canny = cv2.Canny(processed_image, threshold1 = 200, threshold2 =300)
-    processed_image_blur = cv2.GaussianBlur(processed_image_canny, (5,5),0)
-    processed_image_blue = color_filter(original_image,[255,255,255])
-    processed_image_blue_gray = cv2.cvtColor(processed_image_blue, cv2.COLOR_BGR2GRAY)
-    #edges
-    lines = cv2.HoughLinesP(processed_image_blur, 1,np.pi/180, 180, np.array([]), 600, 30)
-    circles = cv2.HoughCircles(processed_image_blue_gray,cv2.HOUGH_GRADIENT, 1.2,5,
-                            param1=60,param2=30,minRadius=20,maxRadius=40 )
-
-    draw_lines(original_image, lines)
-    draw_circles(original_image,circles)
-
-    return processed_image
+##    pImg = color_filter(original_image,[255,0,0])
+##    pImgGray = cv2.cvtColor(pImg, cv2.COLOR_BGR2GRAY)
+##    pImgCanny = cv2.Canny(pImgGray, threshold1 = 200, threshold2 =300)
+##    pImgBlur = cv2.GaussianBlur(pImgCanny, (5,5),0)
+##    #edges
+####    lines = cv2.HoughLinesP(processed_image_blur, 1,np.pi/180, 180, np.array([]), 600, 30)
+##    circles = cv2.HoughCircles(pImgGray,cv2.HOUGH_GRADIENT, 1.2,5,
+##                            param1=60,param2=30,minRadius=20,maxRadius=40 )
+##
+####    draw_lines(original_image, lines)
+##    draw_circles(original_image,circles)
+##    return pImg
+    get_player(original_image)
+    get_ball(original_image)
 
 def screen_record():
     sct = mss()
-    for i in range(1):
     
-##    while 1:
+##    for i in range(1):
+    while 1:
         last_time = time.time()
-        monitor = {'top': 230, 'left': 30, 'width': 820, 'height': 400}        
+        monitor = {'top': 230, 'left': 30, 'width': 820, 'height': 400}
+
+        
         img = np.array(sct.grab(monitor))
+        img = cv2.resize(img, (int(monitor['width']/2),int(monitor['height']/2)))
+        
         processed_img = process_image(img)
-        img_resize = cv2.resize(img, (int(monitor['width']/5),int(monitor['height']/5)))
 
         print('{} FPS'.format(1/(time.time()-last_time)))
         last_time = time.time()
-        
-
-        cv2.imshow('image', img_resize)
-        
+        cv2.imshow('image', img)
         if cv2.waitKey(25) & 0xFF == ord('q'):
             cv2.destroyAllWindows()
             break
