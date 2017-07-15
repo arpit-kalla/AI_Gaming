@@ -4,12 +4,23 @@ import cv2
 import time
 import pyautogui
 import random
+import math
 from mss import mss
+
+
+player_center,player_radius, player_speed  = [],0,0.0
+ball_center,ball_radius,ball_speed  = [],0,0.0
+delta_time = 1
 
 def show_image(image):
     cv2.imshow(str(random.randint(1,101)), image)
     if cv2.waitKey(25) & 0xFF == ord('q'):
         cv2.destroyAllWindows()
+        
+def find_dist(pos1,pos2):
+    x1,y1 = pos1[0],pos1[1]
+    x2,y2 = pos2[0],pos2[1]
+    return math.sqrt((x2-x1)**2+(y2-y1)**2)
 
 # Enter a RGB color and the funtion returns the HSV equivalent
 def rgb2hsv(rgb):
@@ -92,7 +103,8 @@ def get_player(image):
         cv2.circle(image, center, radius, (255, 0, 0), 2)
         cv2.putText(image, "Player Center: {},{}".format(center[0],center[1]), (15, 15),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
-        return center,radius
+        player_center.append(center)
+        player_radius = radius
     except:
         pass
 
@@ -102,7 +114,7 @@ def get_ball(image):
         f_img = cv2.cvtColor(f_img, cv2.COLOR_BGR2GRAY)
         im2 ,contours,hierarchy = cv2.findContours(f_img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for c in contours:
-            if cv2.contourArea(c)>100:
+            if cv2.contourArea(c)>300:
                 M = cv2.moments(c)
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
@@ -112,8 +124,8 @@ def get_ball(image):
                 cv2.circle(image, center, radius, (255, 0, 0), 2)
                 cv2.putText(image, "Ball Center: {},{}".format(center[0],center[1]), (200, 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
-                
-        return center,radius
+                ball_center.append(center)
+                ball_radius = radius               
     except:
         pass
 
@@ -181,7 +193,7 @@ def find_field(vertical,horizontal):
     
     
     
-def process_image(original_image):
+def process_image(image):
 ##    pImg = color_filter(original_image,[255,0,0])
 ##    pImgGray = cv2.cvtColor(pImg, cv2.COLOR_BGR2GRAY)
 ##    pImgCanny = cv2.Canny(pImgGray, threshold1 = 200, threshold2 =300)
@@ -194,9 +206,20 @@ def process_image(original_image):
 ####    draw_lines(original_image, lines)
 ##    draw_circles(original_image,circles)
 ##    return pImg
-    get_player(original_image)
-    get_ball(original_image)
+   
+    get_player(image)
+    get_ball(image)
+    if len(ball_center)>5:
+        ball_speed = find_dist(ball_center[-1],ball_center[-2])/delta_time
+        cv2.putText(image, "Ball Speed: {}".format(ball_speed), (200, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
+    if len(player_center)>5:
+        player_speed = find_dist(player_center[-1],player_center[-2])/delta_time
+        cv2.putText(image, "Player Speed: {}".format(player_speed), (15, 50),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
 
+
+    
 def screen_record():
     sct = mss()
     
@@ -207,11 +230,13 @@ def screen_record():
 
         
         img = np.array(sct.grab(monitor))
-        img = cv2.resize(img, (int(monitor['width']/2),int(monitor['height']/2)))
+ 
         
         processed_img = process_image(img)
-
-        print('{} FPS'.format(1/(time.time()-last_time)))
+        img = cv2.resize(img, (int(monitor['width']/3),int(monitor['height']/3)))
+        delta_time = time.time()-last_time
+        
+        print('{} FPS'.format(1/delta_time))
         last_time = time.time()
         cv2.imshow('image', img)
         if cv2.waitKey(25) & 0xFF == ord('q'):
