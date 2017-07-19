@@ -1,3 +1,10 @@
+——————————————————23 July 2017 00:47AM——————————————————
+
+Found the speed and the acceleration of the player rand the ball.
+Emulated KeyPresses in a new thread but the motion is not smooth. 
+However the plan to smoothen it use ‘time’ to emulate the keypresses 
+For a particular amount of time on the basis of the velocity and acc.
+
 ——————————————————15 July 2017 01:55AM——————————————————
 
 Successfully found the position of the player and the ball
