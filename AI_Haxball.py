@@ -1,22 +1,22 @@
-import numpy as np
-from PIL import ImageGrab, Image
-import cv2
+import threading
 import time
-import pyautogui
-import random
-import math
+import cv2
+import numpy as np
 from mss import mss
+import math
+import pyautogui
 
-
-player_center,player_radius, player_speed  = [],0,0.0
-ball_center,ball_radius,ball_speed  = [],0,0.0
+player_center,player_radius, player_speed,player_acc  = [],0,[],0.0
+ball_center,ball_radius,ball_speed,player_acc  = [],0,[],0.0
 delta_time = 1
 
+# Shows an Image in a new window
 def show_image(image):
     cv2.imshow(str(random.randint(1,101)), image)
     if cv2.waitKey(25) & 0xFF == ord('q'):
         cv2.destroyAllWindows()
-        
+
+# Finds the distance between two points       
 def find_dist(pos1,pos2):
     x1,y1 = pos1[0],pos1[1]
     x2,y2 = pos2[0],pos2[1]
@@ -87,7 +87,8 @@ def color_filter(image,color,pure):
     res = cv2.bitwise_and(image,image, mask= mask)
     return res
 
-
+        
+# Get information of the Player
 def get_player(image):
     try:
         f_img = color_filter(image,[255,0,0],False)
@@ -101,20 +102,20 @@ def get_player(image):
         center = (int(x),int(y))
         radius = int(radius)
         cv2.circle(image, center, radius, (255, 0, 0), 2)
-        cv2.putText(image, "Player Center: {},{}".format(center[0],center[1]), (15, 15),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
+        
         player_center.append(center)
         player_radius = radius
     except:
         pass
 
+# Get information of the Ball
 def get_ball(image):
     try:
         f_img = color_filter(image,[255,255,255],True)
         f_img = cv2.cvtColor(f_img, cv2.COLOR_BGR2GRAY)
         im2 ,contours,hierarchy = cv2.findContours(f_img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for c in contours:
-            if cv2.contourArea(c)>300:
+            if cv2.contourArea(c)>60:
                 M = cv2.moments(c)
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
@@ -122,125 +123,95 @@ def get_ball(image):
                 center = (int(x),int(y))
                 radius = int(radius)
                 cv2.circle(image, center, radius, (255, 0, 0), 2)
-                cv2.putText(image, "Ball Center: {},{}".format(center[0],center[1]), (200, 15),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
                 ball_center.append(center)
                 ball_radius = radius               
     except:
         pass
 
 
- 
-    
-    
-    
-    
-
-def draw_lines(image, lines):
-    try:
-        horizontal = []
-        vertical = []
-        for line in lines:
-            coords = line[0]
-##            cv2.line(image, (coords[0],coords[1]),(coords[2],coords[3]), [255,0,0],3)
-            m,b,isVertical = get_slope_bias(coords)
-            if isVertical:
-                vertical.append(b)
-            else:
-                horizontal.append(b)
-        x1,y1,x2,y2 = find_field(vertical,horizontal)
-
-        cv2.rectangle(image, (x1,y1), (x2,y2),[255,255,0],3)
-    
-
-    except:
-        pass
-
-def draw_circles(image,circles):
-    try:
-        print(len(circles[0]))
-        for circle in circles[0]:
-            x,y,r = circle
-            cv2.circle(image, (x,y),r,(255,0,255),4)
-    except:
-        pass
-    
-def find_field(vertical,horizontal):
-    vertical = sorted(vertical)
-    horizontal = sorted(horizontal)
-
-    vLine  =[]
-    hLine = []
-
-    partition = 0
-    for i in range(len(vertical)-1):
-        if abs(vertical[i+1]-vertical[i])>40:
-            vLine.append(int(sum(vertical[:i+1])/len(vertical[:i+1])))
-            partition = i+1 
-    vLine.append(int(sum(vertical[partition:])/len(vertical[partition:])))
-
-    for i in range(len(horizontal)-1):
-        if abs(horizontal[i+1]-horizontal[i])>60:
-            hLine.append(int(sum(horizontal[:i+1])/len(horizontal[:i+1])))
-            partition = i+1
-    hLine.append(int(sum(horizontal[partition:])/len(horizontal[partition:])))
-
-    return vLine[0],hLine[0],vLine[-1],hLine[-1]
-
-
-    
-
-    
-    
-    
-def process_image(image):
-##    pImg = color_filter(original_image,[255,0,0])
-##    pImgGray = cv2.cvtColor(pImg, cv2.COLOR_BGR2GRAY)
-##    pImgCanny = cv2.Canny(pImgGray, threshold1 = 200, threshold2 =300)
-##    pImgBlur = cv2.GaussianBlur(pImgCanny, (5,5),0)
-##    #edges
-####    lines = cv2.HoughLinesP(processed_image_blur, 1,np.pi/180, 180, np.array([]), 600, 30)
-##    circles = cv2.HoughCircles(pImgGray,cv2.HOUGH_GRADIENT, 1.2,5,
-##                            param1=60,param2=30,minRadius=20,maxRadius=40 )
-##
-####    draw_lines(original_image, lines)
-##    draw_circles(original_image,circles)
-##    return pImg
-   
-    get_player(image)
-    get_ball(image)
-    if len(ball_center)>5:
-        ball_speed = find_dist(ball_center[-1],ball_center[-2])/delta_time
-        cv2.putText(image, "Ball Speed: {}".format(ball_speed), (200, 50),
+# Prints text on the Image
+def show_data(image):
+    if len(ball_center)>1:
+        cv2.putText(image, "Ball Center: {},{}".format(ball_center[-1][0],ball_center[-1][1]), (200, 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
-    if len(player_center)>5:
-        player_speed = find_dist(player_center[-1],player_center[-2])/delta_time
-        cv2.putText(image, "Player Speed: {}".format(player_speed), (15, 50),
+        ball_speed.append(find_dist(ball_center[-1],ball_center[-2])/delta_time)
+        cv2.putText(image, "Ball Speed: {}".format(ball_speed[-1]), (200, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
+    if len(player_center)>1:
+        cv2.putText(image, "Player Center: {},{}".format(player_center[-1][0],player_center[-1][1]), (15, 15),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
+        player_speed.append(find_dist(player_center[-1],player_center[-2])/delta_time)
+        cv2.putText(image, "Player Speed: {}".format(player_speed[-1]), (15, 50),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
 
+    if len(player_speed)>1:
+        player_acc = abs(player_speed[-1]-player_speed[-2])/delta_time
+        cv2.putText(image, "Player Acc: {}".format(player_acc), (15, 100),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
+    if len(ball_speed)>1:
+        ball_acc = abs(ball_speed[-1]-ball_speed[-2])/delta_time
+        cv2.putText(image, "Ball Acc: {}".format(ball_acc), (200, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
 
-    
-def screen_record():
+#All Processing of the image is done here       
+def process_image(image):
+    get_player(image)
+    get_ball(image)
+    show_data(image)
+
+# Grab Screenshots of the Screen
+def get_screen():
     sct = mss()
-    
-##    for i in range(1):
     while 1:
         last_time = time.time()
         monitor = {'top': 230, 'left': 30, 'width': 820, 'height': 400}
-
-        
         img = np.array(sct.grab(monitor))
- 
+        img = cv2.resize(img, (int(monitor['width']/3),int(monitor['height']/3)))
         
         processed_img = process_image(img)
-        img = cv2.resize(img, (int(monitor['width']/3),int(monitor['height']/3)))
+
         delta_time = time.time()-last_time
         
-        print('{} FPS'.format(1/delta_time))
+##        print('{} FPS'.format(1/delta_time))
         last_time = time.time()
+        cv2.rectangle(img, (10,10), (20,20), (255, 0, 0), 1)
         cv2.imshow('image', img)
         if cv2.waitKey(25) & 0xFF == ord('q'):
             cv2.destroyAllWindows()
             break
 
-screen_record()
+
+def emulate():
+    x,y,buffer = 276,132,10
+    while True:
+        if len(player_center)>0 and len(ball_center)>0:
+            pX,pY,pR = player_center[-1][0], player_center[-1][1], player_radius
+            bX,bY,bR = ball_center[-1][0],   ball_center[-1][1],   ball_radius
+            print(pX,pY)
+            if pX-x>buffer:
+                print("a")
+                pyautogui.keyDown('a')
+                pyautogui.keyUp('a')
+            elif x-pX>buffer:
+                print("d")
+                pyautogui.keyDown('d')
+                pyautogui.keyUp('d')
+
+            if pY-y>buffer:
+                print("w")
+                pyautogui.keyDown('w')
+                pyautogui.keyUp('w')
+                
+            elif y-pY>buffer:
+                print("s")
+                pyautogui.keyDown('s')
+                pyautogui.keyUp('s')
+            
+            
+
+        
+
+emulator = threading.Thread(target = emulate)
+emulator.daemon = True
+emulator.start()
+get_screen()
