@@ -5,6 +5,7 @@ import numpy as np
 from mss import mss
 import math
 import pyautogui
+import random
 
 player_center,player_radius, player_speed,player_acc  = [],0,[],0.0
 ball_center,ball_radius,ball_speed,player_acc  = [],0,[],0.0
@@ -138,20 +139,23 @@ def show_data(image):
         cv2.putText(image, "Ball Speed: {}".format(ball_speed[-1]), (200, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
     if len(player_center)>1:
-        cv2.putText(image, "Player Center: {},{}".format(player_center[-1][0],player_center[-1][1]), (15, 15),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
-        player_speed.append(find_dist(player_center[-1],player_center[-2])/delta_time)
-        cv2.putText(image, "Player Speed: {}".format(player_speed[-1]), (15, 50),
+        pX2,pY2 = player_center[-1][0],player_center[-1][1]
+        pX1, pY1 = player_center[-2][0], player_center[-2][1]
+        cv2.putText(image, "Player Center: {},{}".format(pX2,pY2), (15, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
+
+        player_speed.append([(pX2-pX1)/delta_time, (pY2-pY1)/delta_time])
+        print("Player Speed: <{},{}>".format(player_speed[-1][0],player_speed[-1][1]))
+        cv2.putText(image, "Player Speed: <{},{}>".format(player_speed[-1][0],player_speed[-1][1]), (15, 50),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
 
-    if len(player_speed)>1:
-        player_acc = abs(player_speed[-1]-player_speed[-2])/delta_time
-        cv2.putText(image, "Player Acc: {}".format(player_acc), (15, 100),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
-    if len(ball_speed)>1:
-        ball_acc = abs(ball_speed[-1]-ball_speed[-2])/delta_time
-        cv2.putText(image, "Ball Acc: {}".format(ball_acc), (200, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
+    # if len(player_speed)>1:
+    #     player_acc = abs(player_speed[-1]-player_speed[-2])/delta_time
+    #     cv2.putText(image, "Player Acc: {}".format(player_acc), (15, 100),
+    #             cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
+    # if len(ball_speed)>1:
+    #     ball_acc = abs(ball_speed[-1]-ball_speed[-2])/delta_time
+    #     cv2.putText(image, "Ball Acc: {}".format(ball_acc), (200, 100),
+    #                     cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,0), 1)
 
 #All Processing of the image is done here       
 def process_image(image):
@@ -164,7 +168,7 @@ def get_screen():
     sct = mss()
     while 1:
         last_time = time.time()
-        monitor = {'top': 230, 'left': 30, 'width': 820, 'height': 400}
+        monitor = {'top': 230, 'left': 230, 'width': 820, 'height': 400}
         img = np.array(sct.grab(monitor))
         img = cv2.resize(img, (int(monitor['width']/3),int(monitor['height']/3)))
         
@@ -172,9 +176,8 @@ def get_screen():
 
         delta_time = time.time()-last_time
         
-##        print('{} FPS'.format(1/delta_time))
+        # print('{} FPS'.format(1/delta_time))
         last_time = time.time()
-        cv2.rectangle(img, (10,10), (20,20), (255, 0, 0), 1)
         cv2.imshow('image', img)
         if cv2.waitKey(25) & 0xFF == ord('q'):
             cv2.destroyAllWindows()
@@ -182,36 +185,79 @@ def get_screen():
 
 
 def emulate():
-    x,y,buffer = 276,132,10
+    epsilon = 1e-5
+    startTime = time.time()
+    x,y,buffer = 276,132,40
+    pressKeys = {"w": 0.0, "a": 0.0, "s": 0.0, "d": 0.0}
     while True:
-        if len(player_center)>0 and len(ball_center)>0:
+        if len(player_center)>0 and len(ball_center)>0 and len(player_speed)>0:
+
             pX,pY,pR = player_center[-1][0], player_center[-1][1], player_radius
+            pVx,pVy = abs(player_speed[-1][0]),abs(player_speed[-1][1])
             bX,bY,bR = ball_center[-1][0],   ball_center[-1][1],   ball_radius
-            print(pX,pY)
+
+
+
+
+
             if pX-x>buffer:
                 print("a")
-                pyautogui.keyDown('a')
-                pyautogui.keyUp('a')
+                pressKeys["a"] = (pX-x)/(pVx+epsilon)
+
             elif x-pX>buffer:
                 print("d")
-                pyautogui.keyDown('d')
-                pyautogui.keyUp('d')
+                pressKeys["d"] = (x - pX) / (pVx + epsilon)
+
+            else:
+                pressKeys["a"] = 0.0
+                pressKeys["d"] = 0.0
+
 
             if pY-y>buffer:
                 print("w")
-                pyautogui.keyDown('w')
-                pyautogui.keyUp('w')
-                
+                pressKeys["w"] = (pY - y) / (pVy + epsilon)
+
             elif y-pY>buffer:
                 print("s")
-                pyautogui.keyDown('s')
-                pyautogui.keyUp('s')
+                pressKeys["s"] = (y - pY) / (pVy + epsilon)
+
+            else:
+                pressKeys["w"] = 0.0
+                pressKeys["s"] = 0.0
+
+            currTime = time.time()
+            if currTime-startTime < pressKeys["w"]:
+                pyautogui.keyDown("w")
+            else:
+                pyautogui.keyUp("w")
+
+            if currTime-startTime < pressKeys["s"]:
+                pyautogui.keyDown("s")
+            else:
+                pyautogui.keyUp("s")
+
+            if currTime-startTime < pressKeys["a"]:
+                pyautogui.keyDown("a")
+            else:
+                pyautogui.keyUp("a")
+
+            if currTime-startTime < pressKeys["d"]:
+                pyautogui.keyDown("d")
+            else:
+                pyautogui.keyUp("d")
+
+
+
+
             
             
 
-        
+for i in range(3)[-1:]:
+    print(i)
+    time.sleep(1)
 
 emulator = threading.Thread(target = emulate)
 emulator.daemon = True
 emulator.start()
+
 get_screen()
